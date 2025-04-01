@@ -9,7 +9,8 @@ use std::process::exit;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread::spawn;
 
-use log::{error, warn};
+use env_logger::Env;
+use log::{error, info, warn};
 
 use crate::input::{Gamepad, GamepadInput};
 use crate::server::Server;
@@ -28,9 +29,13 @@ fn recv_inputs(receiver: Receiver<[u8; 14]>) -> Result<()> {
     Ok(())
 }
 
+fn setup_logging(default_level: &str) -> () {
+    let env = Env::default().filter_or("LOG", default_level);
+    env_logger::Builder::from_env(env).init();
+}
+
 fn main() {
-    // TODO: configure logging
-    env_logger::init();
+    setup_logging("info");
 
     let (sender, receiver) = channel();
 
@@ -45,7 +50,7 @@ fn main() {
                 ErrorKind::AddrNotAvailable | ErrorKind::Other => {
                     error!("fatal: {}", e);
                     exit(e.raw_os_error().unwrap_or(1));
-                },
+                }
                 _ => warn!("{}", e),
             }
 
