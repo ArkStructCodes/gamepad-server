@@ -3,7 +3,7 @@ name = "gamepad-server"
 version = "0.1.0"
 edition = "2024"
 readme = "README.md"
-license_file = "LICENSE"
+license-file = "LICENSE"
 repository = "https://github.com/ArkStructCodes/gamepad-server"
 
 [profile.release]
