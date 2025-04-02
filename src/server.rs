@@ -10,9 +10,18 @@ use crate::oops;
 
 const MAGIC: [u8; 2] = [0x45, 0x45];
 
-const CONNECT: u8 = 0b001;
-const DISCONNECT: u8 = 0b010;
-const DATA: u8 = 0b100;
+mod message {
+    pub const CONNECT: u8 = 1;
+    pub const DISCONNECT: u8 = 2;
+    pub const DATA: u8 = 4;
+}
+
+mod response {
+    pub const CONNECTION_SUCCESS: &[u8] = &[100];
+    pub const CONNECTION_FAILURE: &[u8] = &[101];
+    pub const DISCONNECTED: &[u8] = &[200];
+    pub const UNSUPPORTED: &[u8] = &[201];
+}
 
 pub(crate) struct Listening;
 pub(crate) struct Connected;
@@ -41,13 +50,13 @@ impl Server<Listening> {
         let (_, peer_addr) = self.socket.recv_from(&mut buffer)?;
 
         let [message_type, payload @ ..] = buffer;
-        if !(message_type == CONNECT && payload == MAGIC) {
-            self.socket.send_to(b"connection rejected", peer_addr)?;
+        if !(message_type == message::CONNECT && payload == MAGIC) {
+            self.socket.send_to(response::CONNECTION_FAILURE, peer_addr)?;
             return oops!(InvalidData, "received invalid connection message");
         }
 
         self.socket.connect(peer_addr)?;
-        self.socket.send(b"connected")?;
+        self.socket.send(response::CONNECTION_SUCCESS)?;
         info!("conncted to {}", peer_addr);
 
         Ok(Server {
@@ -70,7 +79,7 @@ impl Server<Connected> {
             trace!("received {} bytes", length);
 
             match buffer.first() {
-                Some(&DATA) => {
+                Some(&message::DATA) => {
                     let payload = buffer[1..].try_into().unwrap();
                     trace!("payload: {:?}", payload);
 
@@ -78,11 +87,12 @@ impl Server<Connected> {
                         return oops!(Other, "data channel is disconnected");
                     };
                 }
-                Some(&DISCONNECT) => {
-                    self.socket.send(b"disconnected")?;
+                Some(&message::DISCONNECT) => {
+                    self.socket.send(response::DISCONNECTED)?;
                     return oops!(ConnectionAborted, "peer disconnected");
                 }
                 _ => {
+                    self.socket.send(response::UNSUPPORTED)?;
                     return oops!(Unsupported, "message format not supported");
                 }
             }
