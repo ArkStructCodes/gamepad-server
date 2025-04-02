@@ -10,14 +10,14 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread::spawn;
 
 use env_logger::Env;
-use log::{error, info, warn};
+use log::{error, warn};
 
 use crate::input::{Gamepad, GamepadInput};
 use crate::server::Server;
 
 fn start_server(port: u16, sender: Sender<[u8; 14]>) -> Result<()> {
     let server = Server::new(port)?.listen()?;
-    server.recv_to::<14>(sender)
+    server.recv_to(sender)
 }
 
 fn recv_inputs(receiver: Receiver<[u8; 14]>) -> Result<()> {
@@ -29,13 +29,15 @@ fn recv_inputs(receiver: Receiver<[u8; 14]>) -> Result<()> {
     Ok(())
 }
 
-fn setup_logging(default_level: &str) -> () {
+fn init_logger(default_level: &str) -> () {
     let env = Env::default().filter_or("LOG", default_level);
-    env_logger::Builder::from_env(env).init();
+    env_logger::Builder::from_env(env)
+        .format_target(false)
+        .init();
 }
 
 fn main() {
-    setup_logging("info");
+    init_logger("info");
 
     let (sender, receiver) = channel();
 
