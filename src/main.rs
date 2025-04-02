@@ -9,11 +9,11 @@ use std::process::exit;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread::spawn;
 
-use env_logger::Env;
 use log::{error, warn};
 
 use crate::input::{Gamepad, GamepadInput};
 use crate::server::Server;
+use crate::utils::init_logger;
 
 fn start_server(port: u16, sender: Sender<[u8; 14]>) -> Result<()> {
     let server = Server::new(port)?.listen()?;
@@ -27,13 +27,6 @@ fn recv_inputs(receiver: Receiver<[u8; 14]>) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn init_logger(default_level: &str) -> () {
-    let env = Env::default().filter_or("LOG", default_level);
-    env_logger::Builder::from_env(env)
-        .format_target(false)
-        .init();
 }
 
 fn main() {
