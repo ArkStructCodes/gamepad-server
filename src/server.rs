@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use std::net::UdpSocket;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc;
 use std::{io::Result, time::Duration};
 
 use local_ip_address::local_ip;
@@ -11,15 +11,19 @@ use crate::oops;
 const MAGIC: [u8; 2] = [0x45, 0x45];
 
 mod message {
+    // allowed only before establishing connection
     pub const CONNECT: u8 = 1;
+    // allowed only after successfully connecting
     pub const DISCONNECT: u8 = 2;
     pub const DATA: u8 = 4;
     pub const PING: u8 = 8;
 }
 
 mod response {
+    // sent only before establishing connection
     pub const CONNECTION_SUCCESS: &[u8] = &[100];
     pub const CONNECTION_FAILURE: &[u8] = &[101];
+    // sent only after successfully connecting
     pub const DISCONNECTED: &[u8] = &[200];
     pub const UNSUPPORTED: &[u8] = &[201];
     pub const PONG: &[u8] = &[202];
@@ -50,7 +54,7 @@ impl Server<Listening> {
 
         let mut buffer = [0; 3];
         let (_, peer_addr) = self.socket.recv_from(&mut buffer)?;
-        trace!("received handshake bytes: {:?}", buffer);
+        trace!("received handshake bytes: {buffer:?}");
 
         let [message_type, payload @ ..] = buffer;
         if !(message_type == message::CONNECT && payload == MAGIC) {
@@ -60,7 +64,7 @@ impl Server<Listening> {
 
         self.socket.connect(peer_addr)?;
         self.socket.send(response::CONNECTION_SUCCESS)?;
-        info!("conncted to {}", peer_addr);
+        info!("conncted to {peer_addr}");
 
         Ok(Server {
             _state: PhantomData,
@@ -70,7 +74,7 @@ impl Server<Listening> {
 }
 
 impl Server<Connected> {
-    pub fn recv_to<const N: usize>(&self, sender: Sender<[u8; N]>) -> Result<()>
+    pub fn recv_to<const N: usize>(&self, tx: mpsc::Sender<[u8; N]>) -> Result<()>
     where
         [u8; N + 1]:,
     {
@@ -79,14 +83,14 @@ impl Server<Connected> {
 
         let mut buffer = [0; N + 1];
         while let Ok(length) = self.socket.recv(&mut buffer) {
-            trace!("received {} bytes", length);
+            trace!("received {length} bytes");
 
             match buffer.first() {
                 Some(&message::DATA) => {
                     let payload = buffer[1..].try_into().unwrap();
-                    trace!("payload: {:?}", payload);
+                    trace!("payload: {payload:?}");
 
-                    let Ok(_) = sender.send(payload) else {
+                    let Ok(_) = tx.send(payload) else {
                         return oops!(Other, "data channel is disconnected");
                     };
                 }
