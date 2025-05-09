@@ -1,4 +1,4 @@
-pub(crate) fn init_logger(default_level: &str) -> () {
+pub(crate) fn init_logger(default_level: &str) {
     let env = env_logger::Env::default().filter_or("LOG", default_level);
     env_logger::Builder::from_env(env)
         .format_target(false)
