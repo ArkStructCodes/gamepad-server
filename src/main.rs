@@ -45,7 +45,8 @@ fn main() {
                 ErrorKind::AddrNotAvailable | ErrorKind::Other => {
                     error!("fatal: {}", e);
                     exit(e.raw_os_error().unwrap_or(1));
-                }
+                },
+                ErrorKind::ConnectionAborted => warn!("client disconnected"),
                 _ => warn!("{}", e),
             }
 

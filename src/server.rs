@@ -4,7 +4,7 @@ use std::sync::mpsc::Sender;
 use std::{io::Result, time::Duration};
 
 use local_ip_address::local_ip;
-use log::{info, trace};
+use log::{info, debug, trace};
 
 use crate::oops;
 
@@ -14,6 +14,7 @@ mod message {
     pub const CONNECT: u8 = 1;
     pub const DISCONNECT: u8 = 2;
     pub const DATA: u8 = 4;
+    pub const PING: u8 = 8;
 }
 
 mod response {
@@ -21,6 +22,7 @@ mod response {
     pub const CONNECTION_FAILURE: &[u8] = &[101];
     pub const DISCONNECTED: &[u8] = &[200];
     pub const UNSUPPORTED: &[u8] = &[201];
+    pub const PONG: &[u8] = &[202];
 }
 
 pub(crate) struct Listening;
@@ -48,6 +50,7 @@ impl Server<Listening> {
 
         let mut buffer = [0; 3];
         let (_, peer_addr) = self.socket.recv_from(&mut buffer)?;
+        trace!("received handshake bytes: {:?}", buffer);
 
         let [message_type, payload @ ..] = buffer;
         if !(message_type == message::CONNECT && payload == MAGIC) {
@@ -90,6 +93,10 @@ impl Server<Connected> {
                 Some(&message::DISCONNECT) => {
                     self.socket.send(response::DISCONNECTED)?;
                     return oops!(ConnectionAborted, "peer disconnected");
+                }
+                Some(&message::PING) => {
+                    debug!("received ping from client");
+                    self.socket.send(response::PONG)?;
                 }
                 _ => {
                     self.socket.send(response::UNSUPPORTED)?;
