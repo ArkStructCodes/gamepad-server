@@ -1,10 +1,11 @@
+use std::io;
 use std::marker::PhantomData;
 use std::net::UdpSocket;
 use std::sync::mpsc;
-use std::{io::Result, time::Duration};
+use std::time::Duration;
 
 use local_ip_address::local_ip;
-use log::{info, debug, trace};
+use log::{debug, info, trace};
 
 use crate::oops;
 
@@ -38,7 +39,7 @@ pub(crate) struct Server<S = Listening> {
 }
 
 impl Server<Listening> {
-    pub fn new(port: u16) -> Result<Self> {
+    pub fn new(port: u16) -> io::Result<Self> {
         let Ok(local_addr) = local_ip() else {
             return oops!(AddrNotAvailable, "cannot retrieve the local IP address")?;
         };
@@ -49,7 +50,7 @@ impl Server<Listening> {
         })
     }
 
-    pub fn listen(self) -> Result<Server<Connected>> {
+    pub fn listen(self) -> io::Result<Server<Connected>> {
         info!("listening at {}", self.socket.local_addr()?);
 
         let mut buffer = [0; 3];
@@ -58,7 +59,8 @@ impl Server<Listening> {
 
         let [message_type, payload @ ..] = buffer;
         if !(message_type == message::CONNECT && payload == MAGIC) {
-            self.socket.send_to(response::CONNECTION_FAILURE, peer_addr)?;
+            self.socket
+                .send_to(response::CONNECTION_FAILURE, peer_addr)?;
             return oops!(InvalidData, "received invalid connection message");
         }
 
@@ -74,7 +76,7 @@ impl Server<Listening> {
 }
 
 impl Server<Connected> {
-    pub fn recv_to<const N: usize>(&self, tx: mpsc::Sender<[u8; N]>) -> Result<()>
+    pub fn recv_to<const N: usize>(&self, tx: mpsc::Sender<[u8; N]>) -> io::Result<()>
     where
         [u8; N + 1]:,
     {

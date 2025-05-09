@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read, Result};
+use std::io::{self, Read};
 
 use bitvec::{array::BitArray, order::Lsb0};
 use evdev::{AbsInfo, AbsoluteAxisCode, InputEvent, KeyCode, uinput::VirtualDevice};
@@ -11,7 +11,7 @@ pub(crate) struct Gamepad {
 }
 
 impl Gamepad {
-    pub fn new(name: &str) -> Result<Self> {
+    pub fn new(name: &str) -> io::Result<Self> {
         let stick = AbsInfo::new(0, -32768, 32767, 16, 128, 1);
         let trigger = AbsInfo::new(0, 0, 255, 0, 0, 1);
         let dpad = AbsInfo::new(0, -1, 1, 0, 0, 1);
@@ -37,7 +37,7 @@ impl Gamepad {
         Ok(Gamepad { device })
     }
 
-    pub fn emit(&mut self, input: GamepadInput) -> Result<()> {
+    pub fn emit(&mut self, input: GamepadInput) -> io::Result<()> {
         trace!("attempting to emit events: {:?}", input.events);
         self.device.emit(&input.events)
     }
@@ -52,10 +52,10 @@ fn calculate_axis(a: bool, b: bool) -> i32 {
 }
 
 impl TryFrom<&[u8; 14]> for GamepadInput {
-    type Error = std::io::Error;
+    type Error = io::Error;
 
-    fn try_from(data: &[u8; 14]) -> Result<Self> {
-        let mut reader = Cursor::new(data);
+    fn try_from(data: &[u8; 14]) -> io::Result<Self> {
+        let mut reader = io::Cursor::new(data);
         let mut buffer = [0; 2];
 
         reader.read_exact(&mut buffer)?;
