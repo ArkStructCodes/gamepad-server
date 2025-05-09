@@ -57,11 +57,11 @@ fn main() {
 
     thread::spawn(move || {
         loop {
-            let Err(e) = start_server(port, tx.clone()) else {
-                warn!("client timeout, aborting connection");
-                continue;
-            };
-            handle_server_errors(e); // will exit on fatal errors
+            match start_server(port, tx.clone()) {
+                Ok(_) => warn!("client timeout, aborting connection"),
+                // will exit on fatal errors
+                Err(e) => handle_server_errors(e),
+            }
             warn!("reloading server");
             if port == 0 {
                 warn!("selecting a new port");
