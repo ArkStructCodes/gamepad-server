@@ -68,16 +68,16 @@ impl TryFrom<&[u8; 14]> for GamepadInput {
         let [left_trigger, right_trigger] = buffer;
 
         reader.read_exact(&mut buffer)?;
-        let left_stick_x_axis = i16::from_le_bytes(buffer);
+        let left_stick_x_axis = i16::from_be_bytes(buffer);
 
         reader.read_exact(&mut buffer)?;
-        let left_stick_y_axis = i16::from_le_bytes(buffer);
+        let left_stick_y_axis = i16::from_be_bytes(buffer);
 
         reader.read_exact(&mut buffer)?;
-        let right_stick_x_axis = i16::from_le_bytes(buffer);
+        let right_stick_x_axis = i16::from_be_bytes(buffer);
 
         reader.read_exact(&mut buffer)?;
-        let right_stick_y_axis = i16::from_le_bytes(buffer);
+        let right_stick_y_axis = i16::from_be_bytes(buffer);
 
         let events = [
             event!(ABSOLUTE, AbsoluteAxisCode::ABS_X, left_stick_x_axis),
