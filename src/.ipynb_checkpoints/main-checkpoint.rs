@@ -24,6 +24,20 @@ fn start_server(port: u16, tx: mpsc::Sender<[u8; 14]>) -> io::Result<()> {
     server.recv_to(tx)
 }
 
+fn handle_server_errors(error: io::Error) {
+    match error.kind() {
+        io::ErrorKind::AddrNotAvailable |
+        io::ErrorKind::AddrInUse |
+        io::ErrorKind::Other => {
+            error!("FATAL: {error}");
+            let code = error.raw_os_error().unwrap_or(1);
+            process::exit(code);
+        }
+        io::ErrorKind::ConnectionAborted => warn!("client disconnected"),
+        _ => warn!("{error}"),
+    }
+}
+
 fn recv_inputs(rx: mpsc::Receiver<[u8; 14]>) -> io::Result<()> {
     let mut gamepad = Gamepad::new("Virtual Gamepad")?;
     while let Ok(data) = rx.recv() {
@@ -33,16 +47,10 @@ fn recv_inputs(rx: mpsc::Receiver<[u8; 14]>) -> io::Result<()> {
     Ok(())
 }
 
-fn terminate_with_error(e: io::Error) {
-    error!("{e}");
-    let code = e.raw_os_error().unwrap_or(1);
-    process::exit(code);
-}
-
 fn main() {
     utils::init_logger("info");
     let port = get_port_from_args().unwrap_or_else(|| {
-        warn!("No valid port provided, using the default port");
+        warn!("no valid port provided, using the default port");
         11096
     });
     let (tx, rx) = mpsc::channel();
@@ -50,20 +58,18 @@ fn main() {
     thread::spawn(move || {
         loop {
             match start_server(port, tx.clone()) {
-                Ok(_) => warn!("Client timeout, disconnecting"),
-                Err(e) => match e.kind() {
-                    io::ErrorKind::ConnectionAborted => warn!("{e}"),
-                    _ => terminate_with_error(e),
-                },
+                Ok(_) => warn!("client timeout, aborting connection"),
+                // will exit on fatal errors
+                Err(e) => handle_server_errors(e),
             }
-            warn!("Reloading server");
+            warn!("reloading server");
             if port == 0 {
-                warn!("Selecting a new port");
+                warn!("selecting a new port");
             }
         }
     });
 
     if let Err(e) = recv_inputs(rx) {
-        terminate_with_error(e);
+        error!("FATAL: {e}");
     }
 }

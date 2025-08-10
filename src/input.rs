@@ -38,7 +38,7 @@ impl Gamepad {
     }
 
     pub fn emit(&mut self, input: GamepadInput) -> io::Result<()> {
-        trace!("attempting to emit events: {:?}", input.events);
+        trace!("Attempting to emit events: {:?}", input.events);
         self.device.emit(&input.events)
     }
 }

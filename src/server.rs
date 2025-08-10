@@ -1,8 +1,8 @@
-use std::io;
 use std::marker::PhantomData;
 use std::net::UdpSocket;
 use std::sync::mpsc;
 use std::time::Duration;
+use std::{io, net::SocketAddr};
 
 use local_ip_address::local_ip;
 use log::{debug, info, trace};
@@ -34,43 +34,48 @@ pub(crate) struct Listening;
 pub(crate) struct Connected;
 
 pub(crate) struct Server<S = Listening> {
-    _state: PhantomData<S>,
     socket: UdpSocket,
+    _state: PhantomData<S>,
 }
 
 impl Server<Listening> {
     pub fn new(port: u16) -> io::Result<Self> {
         let Ok(local_addr) = local_ip() else {
-            return oops!(AddrNotAvailable, "cannot retrieve the local IP address")?;
+            return oops!(AddrNotAvailable, "Cannot retrieve local IP address")?;
         };
 
         Ok(Server {
-            _state: PhantomData,
             socket: UdpSocket::bind((local_addr, port))?,
+            _state: PhantomData,
         })
     }
 
-    pub fn listen(self) -> io::Result<Server<Connected>> {
-        info!("listening at {}", self.socket.local_addr()?);
-
+    fn wait_for_client(&self) -> io::Result<SocketAddr> {
         let mut buffer = [0; 3];
-        let (_, peer_addr) = self.socket.recv_from(&mut buffer)?;
-        trace!("received handshake bytes: {buffer:?}");
+        let (_, client_addr) = self.socket.recv_from(&mut buffer)?;
+        trace!("Received handshake bytes: {buffer:?}");
 
         let [message_type, payload @ ..] = buffer;
         if !(message_type == message::CONNECT && payload == MAGIC) {
             self.socket
-                .send_to(response::CONNECTION_FAILURE, peer_addr)?;
-            return oops!(InvalidData, "received invalid connection message");
+                .send_to(response::CONNECTION_FAILURE, client_addr)?;
+            return oops!(InvalidData, "Invalid connection message received");
         }
 
-        self.socket.connect(peer_addr)?;
+        Ok(client_addr)
+    }
+
+    pub fn listen(self) -> io::Result<Server<Connected>> {
+        info!("Listening at {}", self.socket.local_addr()?);
+
+        let client_addr = self.wait_for_client()?;
+        self.socket.connect(client_addr)?;
         self.socket.send(response::CONNECTION_SUCCESS)?;
-        info!("conncted to {peer_addr}");
+        info!("Conncted to {client_addr}");
 
         Ok(Server {
-            _state: PhantomData,
             socket: self.socket,
+            _state: PhantomData,
         })
     }
 }
@@ -85,28 +90,28 @@ impl Server<Connected> {
 
         let mut buffer = [0; N + 1];
         while let Ok(length) = self.socket.recv(&mut buffer) {
-            trace!("received {length} bytes");
+            trace!("Received {length} bytes");
 
             match buffer.first() {
                 Some(&message::DATA) => {
                     let payload = buffer[1..].try_into().unwrap();
-                    trace!("payload: {payload:?}");
+                    trace!("Payload: {payload:?}");
 
                     let Ok(_) = tx.send(payload) else {
-                        return oops!(Other, "data channel is disconnected");
+                        return oops!(Other, "Channel is broken, this is bad");
                     };
                 }
                 Some(&message::DISCONNECT) => {
                     self.socket.send(response::DISCONNECTED)?;
-                    return oops!(ConnectionAborted, "peer disconnected");
+                    return oops!(ConnectionAborted, "Client disconnected");
                 }
                 Some(&message::PING) => {
-                    debug!("received ping from client");
+                    debug!("Received ping from client");
                     self.socket.send(response::PONG)?;
                 }
                 _ => {
                     self.socket.send(response::UNSUPPORTED)?;
-                    return oops!(Unsupported, "message format not supported");
+                    return oops!(Unsupported, "Message format not supported");
                 }
             }
         }
