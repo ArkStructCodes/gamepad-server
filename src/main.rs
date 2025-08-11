@@ -16,7 +16,7 @@ use crate::input::{Gamepad, GamepadInput};
 use crate::server::Server;
 
 fn get_port_from_args() -> Option<u16> {
-    env::args().skip(1).next()?.parse().ok()
+    env::args().nth(1)?.parse().ok()
 }
 
 fn start_server(port: u16, tx: mpsc::Sender<[u8; 14]>) -> io::Result<()> {
