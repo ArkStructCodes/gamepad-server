@@ -27,7 +27,7 @@ Soon™ :)
 
 If the device cannot be accessed, ensure the `uinput` [kernel module](https://wiki.archlinux.org/title/Kernel_module) is loaded.
 
-if any issues occur regarding permissions, create a [udev rule](https://wiki.archlinux.org/title/Udev#About_udev_rules) to allow access to the device:
+If any issues occur regarding permissions, create a [udev rule](https://wiki.archlinux.org/title/Udev#About_udev_rules) to allow access to the device:
 
     echo 'KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/60-allow-uinput-access.rules
 
